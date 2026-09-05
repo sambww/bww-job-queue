@@ -23,8 +23,8 @@ export default async function HomePage() {
       <main className="mx-auto max-w-[1500px] px-5 py-6">
         {!board.databaseConfigured ? (
           <div className="mb-5 rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-sand">
-            Database is not configured. Set <code className="font-mono">DATABASE_URL</code> to load
-            live rig queues.
+            Preview layout — set <code className="font-mono">DATABASE_URL</code> to load the live
+            Workiz queue. Sample jobs below are not stored.
           </div>
         ) : null}
 

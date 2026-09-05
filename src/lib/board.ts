@@ -66,17 +66,112 @@ function serializeJob(job: typeof jobs.$inferSelect): BoardJob {
 
 const OPEN_STATUSES = new Set(["queued", "active", "unassigned"]);
 
+function demoJob(partial: Partial<BoardJob> & Pick<BoardJob, "id" | "jobCode" | "customerName">): BoardJob {
+  return {
+    workizId: null,
+    rigId: null,
+    supervisorId: null,
+    address: "",
+    jobType: "",
+    description: "",
+    estimatedStartDate: null,
+    status: "queued",
+    queuePosition: 0,
+    customerEmail: null,
+    customerPhone: null,
+    customerNotifyOptIn: false,
+    supervisorName: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...partial,
+  };
+}
+
+export function demoBoard(): BoardPayload {
+  return {
+    databaseConfigured: false,
+    lastSyncAt: null,
+    lastSyncStatus: null,
+    lastSyncMessage: "DATABASE_URL is not set — showing preview jobs only",
+    supervisors: [
+      { id: "sup-1", name: "Sam Ballard", active: true },
+      { id: "sup-2", name: "Field Supervisor", active: true },
+    ],
+    unassigned: [
+      demoJob({
+        id: "demo-u1",
+        jobCode: "WZ-1003",
+        customerName: "Unmapped Workiz job",
+        address: "Need tag or supervisor mapping",
+        jobType: "Service call",
+        status: "unassigned",
+        queuePosition: 0,
+      }),
+    ],
+    rigs: [
+      {
+        id: "demo-rig-1",
+        name: "Rig 1",
+        active: true,
+        sortOrder: 1,
+        jobs: [
+          demoJob({
+            id: "demo-1",
+            jobCode: "WZ-4401",
+            rigId: "demo-rig-1",
+            customerName: "Jane Wells",
+            address: "100 County Rd, Willis, TX",
+            jobType: "New well",
+            estimatedStartDate: "2026-09-08T13:00:00.000Z",
+            status: "active",
+            queuePosition: 0,
+            supervisorName: "Sam Ballard",
+          }),
+          demoJob({
+            id: "demo-2",
+            jobCode: "WZ-4408",
+            rigId: "demo-rig-1",
+            customerName: "Magnolia Ranch",
+            address: "412 Pine Lake, Magnolia, TX",
+            jobType: "Pump install",
+            estimatedStartDate: "2026-09-10T13:00:00.000Z",
+            queuePosition: 1,
+            supervisorName: "Field Supervisor",
+          }),
+        ],
+      },
+      {
+        id: "demo-rig-2",
+        name: "Rig 2",
+        active: true,
+        sortOrder: 2,
+        jobs: [
+          demoJob({
+            id: "demo-3",
+            jobCode: "WZ-4412",
+            rigId: "demo-rig-2",
+            customerName: "Conroe ISD",
+            address: "88 Lake Rd, Conroe, TX",
+            jobType: "Commercial well",
+            estimatedStartDate: "2026-09-12T13:00:00.000Z",
+            queuePosition: 0,
+          }),
+        ],
+      },
+      {
+        id: "demo-rig-3",
+        name: "Rig 3",
+        active: true,
+        sortOrder: 3,
+        jobs: [],
+      },
+    ],
+  };
+}
+
 export async function getBoard(): Promise<BoardPayload> {
   if (!isDatabaseConfigured()) {
-    return {
-      rigs: [],
-      unassigned: [],
-      supervisors: [],
-      lastSyncAt: null,
-      lastSyncStatus: null,
-      lastSyncMessage: "DATABASE_URL is not set",
-      databaseConfigured: false,
-    };
+    return demoBoard();
   }
 
   const db = await getDb();

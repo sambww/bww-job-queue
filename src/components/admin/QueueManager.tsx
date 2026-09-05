@@ -82,6 +82,11 @@ export function QueueManager({ initial }: { initial: BoardPayload }) {
           Refresh
         </button>
       </div>
+      {!board.databaseConfigured ? (
+        <p className="mb-4 text-sm text-sand">
+          Preview only. Connect DATABASE_URL before assigning or reordering live jobs.
+        </p>
+      ) : null}
       {error ? <p className="mb-4 text-sm text-bad">{error}</p> : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {columns.map((column) => (
@@ -99,7 +104,7 @@ export function QueueManager({ initial }: { initial: BoardPayload }) {
                     <>
                       <button
                         type="button"
-                        disabled={busy !== null || index === 0}
+                        disabled={!board.databaseConfigured || busy !== null || index === 0}
                         onClick={() => move(column.jobs, index, -1, column.id)}
                         className="rounded-md border border-line px-2 py-1 text-xs disabled:opacity-40"
                       >
@@ -107,7 +112,7 @@ export function QueueManager({ initial }: { initial: BoardPayload }) {
                       </button>
                       <button
                         type="button"
-                        disabled={busy !== null || index === column.jobs.length - 1}
+                        disabled={!board.databaseConfigured || busy !== null || index === column.jobs.length - 1}
                         onClick={() => move(column.jobs, index, 1, column.id)}
                         className="rounded-md border border-line px-2 py-1 text-xs disabled:opacity-40"
                       >
@@ -116,7 +121,7 @@ export function QueueManager({ initial }: { initial: BoardPayload }) {
                       <select
                         className="rounded-md border border-line bg-ink px-2 py-1 text-xs"
                         value={job.rigId ?? ""}
-                        disabled={busy !== null}
+                        disabled={!board.databaseConfigured || busy !== null}
                         onChange={(event) => void patchJob(job.id, { rigId: event.target.value || null })}
                       >
                         <option value="">No rig</option>
@@ -129,7 +134,7 @@ export function QueueManager({ initial }: { initial: BoardPayload }) {
                       <select
                         className="rounded-md border border-line bg-ink px-2 py-1 text-xs"
                         value={job.supervisorId ?? ""}
-                        disabled={busy !== null}
+                        disabled={!board.databaseConfigured || busy !== null}
                         onChange={(event) =>
                           void patchJob(job.id, {
                             supervisorId: event.target.value || null,

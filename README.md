@@ -47,6 +47,8 @@ npm run dev
 
 Open `http://localhost:3000` for the public board and `/login` for admin.
 
+Without `DATABASE_URL` the public board renders a labeled preview so you can judge layout. It is not live data.
+
 Schema tables and sample rigs (`Rig 1`–`Rig 3`, `Pump Truck`, `Service`) are created automatically on first database connection.
 
 ```bash
