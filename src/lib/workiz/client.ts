@@ -16,6 +16,20 @@ function withSecret(url: URL) {
   return url;
 }
 
+// Workiz `/job/all/` defaults to only the last 14 days when `start_date` is
+// omitted, and its documented working example always includes `start_date`.
+// Send an explicit, wide lookback so we don't miss older open jobs and so the
+// request matches the shape Workiz expects. Override with WORKIZ_LOOKBACK_DAYS.
+export function workizLookbackDays(): number {
+  const raw = Number(process.env.WORKIZ_LOOKBACK_DAYS);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 365;
+}
+
+export function workizStartDate(days: number, now: Date = new Date()): string {
+  const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  return from.toISOString().slice(0, 10);
+}
+
 function stringifyDetail(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "string") return value.trim();
@@ -82,7 +96,11 @@ export async function workizGet(path: string, params: Record<string, string> = {
 
 export async function pingWorkiz() {
   const started = Date.now();
-  const body = await workizGet("/job/all/", { records: "1", offset: "0" });
+  const body = await workizGet("/job/all/", {
+    records: "1",
+    offset: "0",
+    start_date: workizStartDate(workizLookbackDays()),
+  });
   return {
     ok: true,
     latencyMs: Date.now() - started,
@@ -98,11 +116,14 @@ export async function fetchOpenWorkizJobs(): Promise<WorkizJob[]> {
   let offset = 0;
   const records = 100;
 
+  const startDate = workizStartDate(workizLookbackDays());
+
   for (let page = 0; page < 20; page += 1) {
     const body = (await workizGet("/job/all/", {
       records: String(records),
       offset: String(offset),
       only_open: "true",
+      start_date: startDate,
     })) as { data?: unknown; has_more?: boolean };
 
     const rows = Array.isArray(body?.data) ? (body.data as WorkizJob[]) : [];

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { workizErrorMessage } from "./client";
+import { afterEach, describe, expect, it } from "vitest";
+import { workizErrorMessage, workizLookbackDays, workizStartDate } from "./client";
 
 describe("workizErrorMessage", () => {
   it("surfaces the detail from the `data` field (legacy shape)", () => {
@@ -41,5 +41,35 @@ describe("workizErrorMessage", () => {
     expect(workizErrorMessage(400, null)).toBe("Workiz HTTP 400");
     expect(workizErrorMessage(400, {})).toBe("Workiz HTTP 400");
     expect(workizErrorMessage(400, { data: {} })).toBe("Workiz HTTP 400");
+  });
+});
+
+describe("workizStartDate", () => {
+  it("formats a YYYY-MM-DD date `days` before the reference time", () => {
+    const now = new Date("2026-09-15T15:00:00.000Z");
+    expect(workizStartDate(14, now)).toBe("2026-09-01");
+    expect(workizStartDate(365, now)).toBe("2025-09-15");
+  });
+});
+
+describe("workizLookbackDays", () => {
+  const original = process.env.WORKIZ_LOOKBACK_DAYS;
+  afterEach(() => {
+    if (original === undefined) delete process.env.WORKIZ_LOOKBACK_DAYS;
+    else process.env.WORKIZ_LOOKBACK_DAYS = original;
+  });
+
+  it("defaults to 365 when unset or invalid", () => {
+    delete process.env.WORKIZ_LOOKBACK_DAYS;
+    expect(workizLookbackDays()).toBe(365);
+    process.env.WORKIZ_LOOKBACK_DAYS = "0";
+    expect(workizLookbackDays()).toBe(365);
+    process.env.WORKIZ_LOOKBACK_DAYS = "not-a-number";
+    expect(workizLookbackDays()).toBe(365);
+  });
+
+  it("honors a positive override", () => {
+    process.env.WORKIZ_LOOKBACK_DAYS = "30";
+    expect(workizLookbackDays()).toBe(30);
   });
 });
