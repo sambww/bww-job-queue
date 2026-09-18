@@ -33,7 +33,8 @@ Copy `.env.example` to `.env.local`. Do not commit secrets.
 | `ADMIN_PASSWORD` | yes | Shared password for `/login` |
 | `AUTH_SECRET` | yes | Signs the admin session cookie (32+ random chars) |
 | `WORKIZ_API_TOKEN` | for sync | Workiz Developer API token (path token) |
-| `WORKIZ_AUTH_SECRET` | no | Optional Workiz secret; sent as `secret=` if set |
+| `WORKIZ_AUTH_SECRET` | no | Paired Workiz API secret. **Not** sent on list/ping GETs. Official writes use JSON `auth_secret`; `?secret=` is Easy API / Zapier style and is a likely HTTP 400 on Developer API `/job/all/`. |
+| `WORKIZ_LOOKBACK_DAYS` | no | `start_date` lookback in days (default 365). Workiz defaults to 14 days if `start_date` is omitted. |
 | `CRON_SECRET` | for cron | Bearer token for `GET /api/cron/sync` |
 
 ## Local development
@@ -69,7 +70,7 @@ npm run build
 2. Click **Ping Workiz**, then **Run sync now**.
 3. Open jobs upsert by Workiz UUID / id. New jobs append to the mapped rig queue. Existing jobs refresh customer/address/status fields and **do not change `queuePosition`**. If a job already has a rig assigned by an admin, sync will not steal it.
 
-Workiz list call: `GET https://api.workiz.com/api/v1/{WORKIZ_API_TOKEN}/job/all/?only_open=true`.
+Workiz list call: `GET https://api.workiz.com/api/v1/{WORKIZ_API_TOKEN}/job/all/?records=100&offset=0&only_open=true&start_date=yyyy-MM-dd`. The path token is `WORKIZ_API_TOKEN`. Do not append `secret=`.
 
 ## Job fields
 
