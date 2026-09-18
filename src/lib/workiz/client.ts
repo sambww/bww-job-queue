@@ -1,7 +1,7 @@
 import type { WorkizJob } from "./types";
 
-const DEFAULT_LOOKBACK_DAYS = 365;
-const MAX_ERROR_SNIPPET = 300;
+const DEFAULT_LOOKBACK_DAYS = 730;
+const MAX_ERROR_SNIPPET = 1000;
 
 function workizBaseUrl() {
   const token = process.env.WORKIZ_API_TOKEN?.trim();
@@ -29,10 +29,25 @@ export type JobAllQueryInput = {
 };
 
 /**
+ * Easy API / Zapier-style `?secret=` is not a documented Developer API /job/all/
+ * param and is the leading HTTP 400 hypothesis. Only attach it when explicitly
+ * opted in via WORKIZ_API_MODE=easy (and WORKIZ_AUTH_SECRET is set).
+ */
+export function isWorkizEasyApiMode(): boolean {
+  const mode = (process.env.WORKIZ_API_MODE ?? "developer").trim().toLowerCase();
+  return mode === "easy" || mode === "easy-api" || mode === "easy_api";
+}
+
+export function applyWorkizQueryAuth(params: Record<string, string>): Record<string, string> {
+  if (!isWorkizEasyApiMode()) return params;
+  const secret = process.env.WORKIZ_AUTH_SECRET?.trim();
+  if (!secret) return params;
+  return { ...params, secret };
+}
+
+/**
  * Developer API GET /job/all/ query string.
  * Documented params: records (max 100), offset, only_open, start_date (yyyy-MM-dd), status.
- * Do not attach `secret=` — that is Easy API / Zapier style. The Developer API token
- * lives in the path; the paired secret belongs in POST JSON as `auth_secret` when writing.
  */
 export function buildJobAllQuery(input: JobAllQueryInput): Record<string, string> {
   const records = Math.min(100, Math.max(1, Math.floor(input.records)));
@@ -45,7 +60,7 @@ export function buildJobAllQuery(input: JobAllQueryInput): Record<string, string
   if (input.onlyOpen !== false) {
     params.only_open = "true";
   }
-  return params;
+  return applyWorkizQueryAuth(params);
 }
 
 function stringifyDetail(value: unknown): string {
@@ -59,46 +74,24 @@ function stringifyDetail(value: unknown): string {
   }
 }
 
-function collectErrorParts(body: unknown): string[] {
-  if (!body || typeof body !== "object") return [];
-  const record = body as Record<string, unknown>;
-  const parts: string[] = [];
-  const seen = new Set<string>();
-
-  const push = (value: unknown) => {
-    const detail = stringifyDetail(value);
-    if (!detail || detail === "{}" || detail === "[]" || seen.has(detail)) return;
-    seen.add(detail);
-    parts.push(detail);
-  };
-
-  if ("code" in record && record.code != null && record.code !== "") {
-    push(`code=${stringifyDetail(record.code)}`);
-  }
-  if ("flag" in record && record.flag === false) {
-    push("flag=false");
-  }
-
-  for (const key of ["data", "message", "error", "msg", "errors", "details"]) {
-    if (key in record) push(record[key]);
-  }
-
-  return parts;
+function clip(text: string): string {
+  return text.length > MAX_ERROR_SNIPPET ? `${text.slice(0, MAX_ERROR_SNIPPET)}…` : text;
 }
 
 export function workizErrorMessage(status: number, body: unknown, rawText?: string): string {
   const base = `Workiz HTTP ${status}`;
-  const parts = collectErrorParts(body);
-  if (parts.length > 0) {
-    return `${base}: ${parts.join("; ")}`;
+
+  if (body && typeof body === "object") {
+    const json = stringifyDetail(body);
+    if (json && json !== "{}" && json !== "[]") {
+      return `${base}: ${clip(json)}`;
+    }
+  } else if (typeof body === "string" && body.trim()) {
+    return `${base}: ${clip(body.trim())}`;
   }
 
   const raw = rawText?.trim();
-  if (raw) {
-    const snippet = raw.length > MAX_ERROR_SNIPPET ? `${raw.slice(0, MAX_ERROR_SNIPPET)}…` : raw;
-    return `${base}: ${snippet}`;
-  }
-
+  if (raw) return `${base}: ${clip(raw)}`;
   return base;
 }
 
@@ -108,7 +101,7 @@ function isWorkizFailureFlag(body: unknown): boolean {
 
 export async function workizGet(path: string, params: Record<string, string> = {}) {
   const url = new URL(`${workizBaseUrl()}${path}`);
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(applyWorkizQueryAuth(params))) {
     url.searchParams.set(key, value);
   }
 
