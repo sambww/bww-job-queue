@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { BoardJob } from "@/lib/board";
-import { formatDate } from "@/lib/format";
+import { formatJobStart } from "@/lib/format";
 import { StatusBadge } from "./StatusBadge";
 
 export function JobCard({
@@ -35,7 +35,7 @@ export function JobCard({
           </div>
         ) : null}
         <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-xs">
-          <span>Start {formatDate(job.estimatedStartDate)}</span>
+          <span>Start {formatJobStart(job.estimatedStartDate)}</span>
           {job.supervisorName ? <span>Sup. {job.supervisorName}</span> : null}
         </div>
         {job.description ? <p className="pt-1 text-xs leading-5 text-muted/90">{job.description}</p> : null}

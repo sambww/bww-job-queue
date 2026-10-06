@@ -1,3 +1,5 @@
+import { parseWorkizDateTime } from "./chicagoTime";
+
 export const JOB_STATUSES = ["queued", "active", "completed", "cancelled", "unassigned"] as const;
 
 export type JobStatus = (typeof JOB_STATUSES)[number];
@@ -14,6 +16,6 @@ export function emptyToNull(value: unknown): string | null {
 
 export function parseDate(value: unknown): Date | null {
   if (!value) return null;
-  const date = value instanceof Date ? value : new Date(String(value));
-  return Number.isNaN(date.getTime()) ? null : date;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  return parseWorkizDateTime(String(value));
 }

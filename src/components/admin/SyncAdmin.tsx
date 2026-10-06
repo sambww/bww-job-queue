@@ -49,7 +49,14 @@ export function SyncAdmin({ initialRuns }: { initialRuns: SyncRun[] }) {
     setMessage("");
     const response = await fetch("/api/workiz/sync", { method: "POST" });
     const data = (await response.json().catch(() => null)) as
-      | { error?: string; jobsPulled?: number; jobsCreated?: number; jobsUpdated?: number }
+      | {
+          error?: string;
+          jobsPulled?: number;
+          jobsCreated?: number;
+          jobsUpdated?: number;
+          jobsClosed?: number;
+          closeSkipped?: "empty" | "incomplete" | null;
+        }
       | null;
     setPending(null);
     if (!response.ok) {
@@ -57,8 +64,14 @@ export function SyncAdmin({ initialRuns }: { initialRuns: SyncRun[] }) {
       await refresh();
       return;
     }
+    const closeNote =
+      data?.closeSkipped === "empty"
+        ? " Close-out skipped because the pull was empty."
+        : data?.closeSkipped === "incomplete"
+          ? " Close-out skipped because the pull was incomplete."
+          : "";
     setMessage(
-      `Synced ${data?.jobsPulled ?? 0} open jobs (${data?.jobsCreated ?? 0} new, ${data?.jobsUpdated ?? 0} updated).`,
+      `Synced ${data?.jobsPulled ?? 0} open jobs (${data?.jobsCreated ?? 0} new, ${data?.jobsUpdated ?? 0} updated, ${data?.jobsClosed ?? 0} closed).${closeNote}`,
     );
     await refresh();
   }
@@ -69,7 +82,8 @@ export function SyncAdmin({ initialRuns }: { initialRuns: SyncRun[] }) {
         <h2 className="text-2xl font-semibold">Workiz Easy Live Sync</h2>
         <p className="mt-1 max-w-3xl text-sm text-muted">
           Pulls open Workiz jobs every 15 minutes via Vercel Cron. Mapping is by tag, then supervisor
-          name. Existing rows are updated in place and keep the queue order an admin set.
+          name. Existing rows keep the rig and queue order an admin set. After a complete pull,
+          jobs Workiz no longer lists as open are marked completed and leave the board.
         </p>
       </div>
 

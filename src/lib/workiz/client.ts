@@ -138,23 +138,72 @@ export async function pingWorkiz() {
   };
 }
 
-export async function fetchOpenWorkizJobs(): Promise<WorkizJob[]> {
+export type OpenWorkizPull = {
+  jobs: WorkizJob[];
+  /** False when pagination stopped before Workiz confirmed the list was finished. */
+  complete: boolean;
+  /** `start_date` sent with every page of this pull (`yyyy-MM-dd`). */
+  startDate: string;
+};
+
+const MAX_JOB_PAGES = 20;
+
+/**
+ * Decide whether another page is required and whether the pages already fetched
+ * are a complete open-job list. A short page, or `has_more: false`, ends a
+ * complete pull. A full page with `has_more: true` (or with the flag omitted)
+ * keeps going. Hitting the page cap first is an incomplete pull.
+ */
+export function isOpenJobPullComplete(input: {
+  hasMore: boolean | null;
+  pageCount: number;
+  pageSize: number;
+  pagesFetched: number;
+  maxPages: number;
+}): { done: boolean; complete: boolean } {
+  if (input.hasMore === true) {
+    if (input.pagesFetched >= input.maxPages) return { done: true, complete: false };
+    return { done: false, complete: false };
+  }
+  if (input.pageCount < input.pageSize || input.hasMore === false) {
+    return { done: true, complete: true };
+  }
+  if (input.pagesFetched >= input.maxPages) return { done: true, complete: false };
+  return { done: false, complete: false };
+}
+
+export async function fetchOpenWorkizJobs(): Promise<OpenWorkizPull> {
   const jobs: WorkizJob[] = [];
   let offset = 0;
   const records = 100;
   const now = new Date();
+  const startDate = workizStartDate(workizLookbackDays(), now);
 
-  for (let page = 0; page < 20; page += 1) {
-    const body = (await workizGet(
-      "/job/all/",
-      buildJobAllQuery({ records, offset, now }),
-    )) as { data?: unknown; has_more?: boolean };
+  for (let page = 0; page < MAX_JOB_PAGES; page += 1) {
+    const body = (await workizGet("/job/all/", buildJobAllQuery({ records, offset, now }))) as {
+      data?: unknown;
+      has_more?: unknown;
+    };
 
-    const rows = Array.isArray(body?.data) ? (body.data as WorkizJob[]) : [];
+    if (!Array.isArray(body?.data)) {
+      throw new Error("Workiz job list returned no data array");
+    }
+
+    const rows = body.data as WorkizJob[];
     jobs.push(...rows);
-    if (!body?.has_more || rows.length < records) break;
+    const hasMore = typeof body.has_more === "boolean" ? body.has_more : null;
+    const decision = isOpenJobPullComplete({
+      hasMore,
+      pageCount: rows.length,
+      pageSize: records,
+      pagesFetched: page + 1,
+      maxPages: MAX_JOB_PAGES,
+    });
+    if (decision.done) {
+      return { jobs, complete: decision.complete, startDate };
+    }
     offset += records;
   }
 
-  return jobs;
+  return { jobs, complete: false, startDate };
 }

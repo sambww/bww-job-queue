@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatDateTime } from "@/lib/format";
 
 export function SiteHeader({
   lastSyncAt,
@@ -26,7 +27,7 @@ export function SiteHeader({
             <p>Workiz Easy Live Sync</p>
             <p>
               {lastSyncStatus ? `${lastSyncStatus} · ` : ""}
-              {lastSyncAt ? new Date(lastSyncAt).toLocaleString() : "Awaiting first sync"}
+              {lastSyncAt ? formatDateTime(lastSyncAt) : "Awaiting first sync"}
             </p>
           </div>
           <Link

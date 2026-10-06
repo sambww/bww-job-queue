@@ -1,4 +1,5 @@
 import { asTagList } from "../asTagList";
+import { parseWorkizDateTime } from "../chicagoTime";
 import { emptyToNull } from "../jobFields";
 import type { MappedWorkizJob, MappingRecord, WorkizJob } from "./types";
 
@@ -112,7 +113,7 @@ export function mapWorkizJob(job: WorkizJob): MappedWorkizJob | null {
   const jobCode = serial ? `WZ-${serial}` : `WZ-${workizId.slice(0, 8)}`;
 
   const startRaw = firstString(job, ["JobDateTime", "JobEndDateTime", "date", "startDate"]);
-  const estimatedStartDate = startRaw ? new Date(startRaw.replace(" ", "T")) : null;
+  const estimatedStartDate = parseWorkizDateTime(startRaw);
 
   const supervisorCandidates = extractSupervisorCandidates(job);
 
@@ -124,8 +125,7 @@ export function mapWorkizJob(job: WorkizJob): MappedWorkizJob | null {
     jobType,
     description:
       firstString(job, ["Comments", "JobNotes", "description", "Description", "Notes"]) ?? "",
-    estimatedStartDate:
-      estimatedStartDate && !Number.isNaN(estimatedStartDate.getTime()) ? estimatedStartDate : null,
+    estimatedStartDate,
     status: mapWorkizStatus(firstString(job, ["Status", "status", "SubStatus"])),
     customerEmail: emptyToNull(
       firstString(job, ["Email", "email"]) ?? nestedString(clientInfo, ["email", "Email"]),

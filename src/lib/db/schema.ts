@@ -58,6 +58,11 @@ export const workizMappings = pgTable("workiz_mappings", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const appFlags = pgTable("app_flags", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
 export const syncRuns = pgTable("sync_runs", {
   id: uuid("id").defaultRandom().primaryKey(),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
