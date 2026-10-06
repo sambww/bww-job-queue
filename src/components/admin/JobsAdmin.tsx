@@ -3,7 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { BoardJob } from "@/lib/board";
-import { formatDate } from "@/lib/format";
+import { formatDateInput, formatJobStart } from "@/lib/format";
 import { JOB_STATUSES } from "@/lib/jobFields";
 
 type RigOption = { id: string; name: string };
@@ -55,7 +55,7 @@ export function JobsAdmin({
       address: job.address,
       jobType: job.jobType,
       description: job.description,
-      estimatedStartDate: job.estimatedStartDate ? job.estimatedStartDate.slice(0, 10) : "",
+      estimatedStartDate: formatDateInput(job.estimatedStartDate),
       status: job.status,
       rigId: job.rigId ?? "",
       supervisorId: job.supervisorId ?? "",
@@ -259,7 +259,7 @@ export function JobsAdmin({
                   <div>{rigs.find((rig) => rig.id === job.rigId)?.name ?? "Unassigned"}</div>
                   <div>{job.supervisorName || "—"}</div>
                 </td>
-                <td className="px-3 py-3 text-xs">{formatDate(job.estimatedStartDate)}</td>
+                <td className="px-3 py-3 text-xs">{formatJobStart(job.estimatedStartDate)}</td>
                 <td className="px-3 py-3">
                   <StatusBadge status={job.status} />
                 </td>

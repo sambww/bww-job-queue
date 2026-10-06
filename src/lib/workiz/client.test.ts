@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   applyWorkizQueryAuth,
   buildJobAllQuery,
+  isOpenJobPullComplete,
   isWorkizEasyApiMode,
   workizErrorMessage,
   workizLookbackDays,
@@ -91,6 +92,74 @@ describe("workizLookbackDays", () => {
   it("honors a positive override", () => {
     process.env.WORKIZ_LOOKBACK_DAYS = "30";
     expect(workizLookbackDays()).toBe(30);
+  });
+});
+
+describe("isOpenJobPullComplete", () => {
+  it("treats a short page as a finished pull", () => {
+    expect(
+      isOpenJobPullComplete({
+        hasMore: null,
+        pageCount: 45,
+        pageSize: 100,
+        pagesFetched: 1,
+        maxPages: 20,
+      }),
+    ).toEqual({ done: true, complete: true });
+  });
+
+  it("keeps paging a full page when Workiz says there is more, and refuses the cap", () => {
+    expect(
+      isOpenJobPullComplete({
+        hasMore: true,
+        pageCount: 100,
+        pageSize: 100,
+        pagesFetched: 1,
+        maxPages: 20,
+      }),
+    ).toEqual({ done: false, complete: false });
+    expect(
+      isOpenJobPullComplete({
+        hasMore: true,
+        pageCount: 100,
+        pageSize: 100,
+        pagesFetched: 20,
+        maxPages: 20,
+      }),
+    ).toEqual({ done: true, complete: false });
+  });
+
+  it("accepts an explicit has_more false even when the page is full", () => {
+    expect(
+      isOpenJobPullComplete({
+        hasMore: false,
+        pageCount: 100,
+        pageSize: 100,
+        pagesFetched: 1,
+        maxPages: 20,
+      }),
+    ).toEqual({ done: true, complete: true });
+  });
+
+  it("does not call a full page complete when has_more is missing", () => {
+    expect(
+      isOpenJobPullComplete({
+        hasMore: null,
+        pageCount: 100,
+        pageSize: 100,
+        pagesFetched: 1,
+        maxPages: 20,
+      }),
+    ).toEqual({ done: false, complete: false });
+    expect(
+      isOpenJobPullComplete({
+        hasMore: null,
+        pageCount: 100,
+        pageSize: 100,
+        pagesFetched: 20,
+        maxPages: 20,
+      }),
+    ).toEqual({ done: true, complete: false });
   });
 });
 

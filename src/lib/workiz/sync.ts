@@ -1,15 +1,19 @@
-import { and, desc, eq, isNotNull, max, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, max, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { jobs, syncRuns, workizMappings, supervisors } from "../db/schema";
+import { backfillChicagoStartTimesOnce } from "./backfillStartTimes";
 import { fetchOpenWorkizJobs } from "./client";
-import { mapWorkizJob, resolveRigId } from "./mapJob";
+import { extractWorkizId, mapWorkizJob, resolveRigId } from "./mapJob";
+import { shouldCloseMissingWorkizJob } from "./reconcile";
 
 export type SyncResult = {
   jobsPulled: number;
   jobsCreated: number;
   jobsUpdated: number;
+  jobsClosed: number;
   jobsUnmapped: number;
   skipped: number;
+  closeSkipped: "empty" | "incomplete" | null;
 };
 
 async function nextQueuePosition(db: Awaited<ReturnType<typeof getDb>>, rigId: string | null) {
@@ -36,12 +40,15 @@ export async function runWorkizSync(): Promise<SyncResult> {
   const [run] = await db.insert(syncRuns).values({ status: "running" }).returning();
 
   try {
-    const [openJobs, mappings, existing, supervisorRows] = await Promise.all([
+    await backfillChicagoStartTimesOnce();
+
+    const [pull, mappings, existing, supervisorRows] = await Promise.all([
       fetchOpenWorkizJobs(),
       db.select().from(workizMappings),
       db.select().from(jobs).where(isNotNull(jobs.workizId)),
       db.select().from(supervisors),
     ]);
+    const openJobs = pull.jobs;
 
     const existingByWorkizId = new Map(
       existing.filter((job) => job.workizId).map((job) => [job.workizId as string, job]),
@@ -51,8 +58,11 @@ export async function runWorkizSync(): Promise<SyncResult> {
     let jobsUpdated = 0;
     let jobsUnmapped = 0;
     let skipped = 0;
+    const seenWorkizIds = new Set<string>();
 
     for (const raw of openJobs) {
+      const workizId = extractWorkizId(raw);
+      if (workizId) seenWorkizIds.add(workizId);
       const mapped = mapWorkizJob(raw);
       if (!mapped) {
         skipped += 1;
@@ -112,12 +122,47 @@ export async function runWorkizSync(): Promise<SyncResult> {
       jobsUpdated += 1;
     }
 
+    const idsToClose = existing
+      .filter((job) =>
+        shouldCloseMissingWorkizJob({
+          pullComplete: pull.complete,
+          seenWorkizIds,
+          workizId: job.workizId,
+          status: job.status,
+          estimatedStartDate: job.estimatedStartDate,
+          pullStartDate: pull.startDate,
+        }),
+      )
+      .map((job) => job.id);
+
+    let jobsClosed = 0;
+    if (idsToClose.length > 0) {
+      const closed = await db
+        .update(jobs)
+        .set({ status: "completed", updatedAt: new Date() })
+        .where(inArray(jobs.id, idsToClose))
+        .returning({ id: jobs.id });
+      jobsClosed = closed.length;
+    }
+
+    let closeNote = "";
+    let closeSkipped: SyncResult["closeSkipped"] = null;
+    if (!pull.complete) {
+      closeSkipped = "incomplete";
+      closeNote = " Skipped close-out because the open-job pull was incomplete.";
+    } else if (seenWorkizIds.size === 0) {
+      closeSkipped = "empty";
+      closeNote = " Skipped close-out because the open-job pull was empty.";
+    }
+
     const result: SyncResult = {
       jobsPulled: openJobs.length,
       jobsCreated,
       jobsUpdated,
+      jobsClosed,
       jobsUnmapped,
       skipped,
+      closeSkipped,
     };
 
     await db
@@ -125,7 +170,7 @@ export async function runWorkizSync(): Promise<SyncResult> {
       .set({
         finishedAt: new Date(),
         status: "success",
-        message: `Pulled ${result.jobsPulled}, created ${result.jobsCreated}, updated ${result.jobsUpdated}, unmapped ${result.jobsUnmapped}.`,
+        message: `Pulled ${result.jobsPulled}, created ${result.jobsCreated}, updated ${result.jobsUpdated}, closed ${result.jobsClosed}, unmapped ${result.jobsUnmapped}.${closeNote}`,
         jobsPulled: result.jobsPulled,
         jobsCreated: result.jobsCreated,
         jobsUpdated: result.jobsUpdated,

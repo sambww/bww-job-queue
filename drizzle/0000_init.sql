@@ -47,6 +47,11 @@ CREATE TABLE IF NOT EXISTS workiz_mappings (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS app_flags (
+  key text PRIMARY KEY,
+  value text NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS sync_runs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   started_at timestamptz NOT NULL DEFAULT now(),
